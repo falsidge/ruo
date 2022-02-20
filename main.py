@@ -107,7 +107,10 @@ class Client:
         data = {"akey":self.akey,"fips_status":"1","hsm_status":"true","pkpush":"rsa-sha512"}
         
         signature = self.generate_signature("GET", path, time, data)
-        r = requests.get(f"https://{self.host}{path}",params=data, headers={"Authorization":signature, "x-duo-date":time,"host":self.host})
+        try:
+            r = requests.get(f"https://{self.host}{path}",params=data, headers={"Authorization":signature, "x-duo-date":time,"host":self.host})
+        except requests.exceptions.ConnectionError:
+            return None
         return r.json()
 
     def reply_transaction(self, transactionid, answer):
@@ -165,6 +168,9 @@ def main():
     
     while True:
         r = c.get_transactions()
+        if (r == None):
+            print("Connection Error")
+            continue
         t = r["response"]["transactions"]
         print("Checking for transactions")
         if len(t):
