@@ -83,9 +83,12 @@ class Client:
 
     def activate(self):
         if self.code:
-            d = {"pubkey": self.pubkey.publickey().export_key("PEM").decode('ascii'),"pkpush":"rsa-sha512"}
-            r = requests.post(f"https://{self.host}/push/v2/activation/{self.code}?customer_protocol=1",data=d)
-            
+            # set up URL parameters
+            params = {"customer_protocol": "1", "pubkey": self.pubkey.publickey().export_key("PEM").decode('ascii'), "pkpush": "rsa-sha512", "jailbroken": "false", "architecture": "arm64", "region": "US", "app_id": "com.duosecurity.duomobile", "full_disk_encryption": "true", "passcode_status": "true", "platform": "Android", "app_version": "3.49.0", "app_build_number": "323001", "version": "11", "manufacturer": "unknown", "language": "en", "model": "Browser Extension", "security_patch_level": "2021-02-01"}
+            # send activation request
+            r = requests.post(f"https://{self.host}/push/v2/activation/{self.code}",params=params)
+            # print(r.request.url)
+
             response = r.json()
             self.import_response(response)
         else:
