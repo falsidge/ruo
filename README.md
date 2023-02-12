@@ -1,5 +1,5 @@
 # ruo
-Bypass Duo Push
+Approve Duo Push requests without a phone.
 
 # Requirements
 1. Python
