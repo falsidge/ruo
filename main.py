@@ -144,8 +144,8 @@ class Client:
         dt = datetime.datetime.utcnow()
         time = email.utils.format_datetime(dt)
         path = "/push/v2/device/registration"
-        data = {"akey": self.akey, "token": token, "fips_status": "1",
-                "hsm_status": "True", "pkpush": "rsa-sha512"}
+        data = {"akey": self.akey, "token": token}
+
 
         # if answer == "approve":
         #     data["touch_id"] = False
@@ -154,7 +154,17 @@ class Client:
         signature = self.generate_signature("POST", path, time, data)
         r = requests.post(f"https://{self.host}{path}", data=data, headers={
                           "Authorization": signature, "x-duo-date": time, "host": self.host})
+    def device_info(self):
+        dt = datetime.datetime.utcnow()
+        time = email.utils.format_datetime(dt)
+        path = "/push/v2/device/info"
+        data = {"akey": self.akey, "fips_status": "1",
+                "hsm_status": "true", "pkpush": "rsa-sha512"}
 
+        signature = self.generate_signature("GET", path, time, data)
+        r = requests.get(f"https://{self.host}{path}", params=data, headers={
+                         "Authorization": signature, "x-duo-date": time, "host": self.host})
+        return r.json()
 
 # c = Client(response="response.json",keyfile="mykey.pem",code="")
 # print(c)
