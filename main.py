@@ -1,18 +1,17 @@
 import time
 import pathlib
+import threading
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA512
-
 
 import urllib.parse
 import io
 import base64
 import datetime
 import email.utils
-import json
-
 import requests
+import json
 
 
 class Client:
@@ -36,7 +35,7 @@ class Client:
         return repr(self)
 
     def __repr__(self) -> str:
-        return "Client("+",".join([(self.__dict__[i] or '') and (i+'='+self.__dict__[i]) for i in ["akey", "pkey", "host"]])+")"
+        return "Client(" + ",".join([(self.__dict__[i] or '') and (i + '=' + self.__dict__[i]) for i in ["akey", "pkey", "host"]]) + ")"
 
     def import_key(self, keyfile):
         if issubclass(type(keyfile), io.IOBase):
@@ -106,7 +105,7 @@ class Client:
 
         h = SHA512.new(message)
         signature = pkcs1_15.new(self.pubkey).sign(h)
-        auth = ("Basic "+base64.b64encode((self.pkey + ":" +
+        auth = ("Basic " + base64.b64encode((self.pkey + ":" +
                 base64.b64encode(signature).decode('ascii')).encode('ascii')).decode('ascii'))
         return auth
 
@@ -126,7 +125,7 @@ class Client:
     def reply_transaction(self, transactionid, answer):
         dt = datetime.datetime.utcnow()
         time = email.utils.format_datetime(dt)
-        path = "/push/v2/device/transactions/"+transactionid
+        path = "/push/v2/device/transactions/" + transactionid
         data = {"akey": self.akey, "answer": answer, "fips_status": "1",
                 "hsm_status": "true", "pkpush": "rsa-sha512"}
 
@@ -146,7 +145,6 @@ class Client:
         path = "/push/v2/device/registration"
         data = {"akey": self.akey, "token": token}
 
-
         # if answer == "approve":
         #     data["touch_id"] = False
         # data["push_received"] = True
@@ -154,6 +152,7 @@ class Client:
         signature = self.generate_signature("POST", path, time, data)
         r = requests.post(f"https://{self.host}{path}", data=data, headers={
                           "Authorization": signature, "x-duo-date": time, "host": self.host})
+
     def device_info(self):
         dt = datetime.datetime.utcnow()
         time = email.utils.format_datetime(dt)
@@ -166,9 +165,30 @@ class Client:
                          "Authorization": signature, "x-duo-date": time, "host": self.host})
         return r.json()
 
+
+def loop(c):
+    while True:
+        try:
+            r = c.get_transactions()
+        except requests.exceptions.ConnectionError:
+            print("Connection Error")
+            time.sleep(5)
+            continue
+
+        t = r["response"]["transactions"]
+        print("Checking for transactions")
+        if len(t):
+            for tx in t:
+                print(tx)
+                c.reply_transaction(tx["urgid"], 'approve')
+                time.sleep(2)
+        else:
+            print("No transactions")
+        time.sleep(10)
+
 # c = Client(response="response.json",keyfile="mykey.pem",code="")
 # print(c)
-# #print(c.get_transactions())
+# print(c.get_transactions())
 # print(c.reply_transaction("","approve"))
 
 
@@ -200,25 +220,9 @@ def main():
         c.activate()
         c.export_response()
 
-    while True:
-        try:
-            r = c.get_transactions()
-        except requests.exceptions.ConnectionError:
-            print("Connection Error")
-            time.sleep(5)
-            continue
-
-        t = r["response"]["transactions"]
-        print("Checking for transactions")
-        if len(t):
-            for tx in t:
-                print(tx)
-                c.reply_transaction(tx["urgid"], 'approve')
-                time.sleep(2)
-        else:
-            print("No transactions")
-
-        time.sleep(10)
+    l = threading.Thread(target=loop, args=(c,), daemon=True)
+    l.start()
+    input()
 
 
 if __name__ == "__main__":
